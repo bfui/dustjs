@@ -1,36 +1,24 @@
-/*! Dust - Asynchronous Templating - v2.2.3
+/*! Dust - Asynchronous Templating - v2.3.0
 * http://linkedin.github.io/dustjs/
-* Copyright (c) 2013 Aleksander Williams; Released under the MIT License */
-/*jshint evil:true*/
-var dust = {};
-
-function getGlobal(){
-  return (function(){
-    return this.dust;
-  }).call(null);
-}
-
-(function(dust) {
-
-  if(!dust) {
-    return;
-  }
-  var ERROR = 'ERROR',
+* Copyright (c) 2014 Aleksander Williams; Released under the MIT License */
+(function(root) {
+  var dust = {},
+      ERROR = 'ERROR',
       WARN = 'WARN',
       INFO = 'INFO',
       DEBUG = 'DEBUG',
       levels = [DEBUG, INFO, WARN, ERROR],
       EMPTY_FUNC = function() {},
-      logger = EMPTY_FUNC;
+      logger = EMPTY_FUNC,
+      loggerContext = this;
 
   dust.isDebug = false;
   dust.debugLevel = INFO;
 
-  // Try to find the console logger in window scope (browsers) or top level scope (node.js)
-  if (typeof window !== 'undefined' && window && window.console && window.console.log) {
-    logger = window.console.log;
-  } else if (typeof console !== 'undefined' && console && console.log) {
-    logger = console.log;
+  // Try to find the console logger in global scope
+  if (root && root.console && root.console.log) {
+    logger = root.console.log;
+    loggerContext = root.console;
   }
 
   /**
@@ -47,7 +35,7 @@ function getGlobal(){
         dust.logQueue = [];
       }
       dust.logQueue.push({message: message, type: type});
-      logger.call(console || window.console, '[DUST ' + type + ']: ' + message);
+      logger.call(loggerContext, '[DUST ' + type + ']: ' + message);
     }
   };
 
@@ -154,13 +142,9 @@ function getGlobal(){
   }
 
   dust.nextTick = (function() {
-    if (typeof process !== 'undefined') {
-      return process.nextTick;
-    } else {
-      return function(callback) {
-        setTimeout(callback,0);
-      };
-    }
+    return function(callback) {
+      setTimeout(callback,0);
+    };
   } )();
 
   dust.isEmpty = function(value) {
@@ -174,7 +158,7 @@ function getGlobal(){
   };
 
   // apply the filter chain and return the output string
-  dust.filter = function(string, auto, filters) {
+  dust.filter = function(string, auto, filters, context) {
     if (filters) {
       for (var i=0, len=filters.length; i<len; i++) {
         var name = filters[i];
@@ -183,7 +167,7 @@ function getGlobal(){
           dust.log('Using unescape filter on [' + string + ']', DEBUG);
         }
         else if (typeof dust.filters[name] === 'function') {
-          string = dust.filters[name](string);
+          string = dust.filters[name](string, context);
         }
         else {
           dust.onError(new Error('Invalid filter [' + name + ']'));
@@ -192,7 +176,7 @@ function getGlobal(){
     }
     // by default always apply the h filter, unless asked to unescape with |s
     if (auto) {
-      string = dust.filters[auto](string);
+      string = dust.filters[auto](string, context);
     }
     return string;
   };
@@ -216,7 +200,18 @@ function getGlobal(){
       } else {
         return JSON.parse(value);
       }
-    }
+    },
+		eb: function(value, context){
+			var phs = value.match(/\{([0-9a-zA-Z]+?)\}/g);
+			var pn, pval, rx;
+			for (var i = 0, len = phs.length; i<len; i++) {
+				pn = phs[i].substr(1).replace("}","");
+				pval = context.get(pn);
+				rx = new RegExp("{" + pn + "}", "g");
+				value = value.replace(rx,pval);
+			}
+			return value;
+		}
   };
 
   function Context(stack, global, blocks, templateName) {
@@ -569,7 +564,7 @@ function getGlobal(){
       }
     }
     if (!dust.isEmpty(elem)) {
-      return this.write(dust.filter(elem, auto, filters));
+      return this.write(dust.filter(elem, auto, filters, context));
     } else {
       return this;
     }
@@ -819,11 +814,12 @@ function getGlobal(){
     return s;
   };
 
-})(dust);
 
-if (typeof exports !== 'undefined') {
-  if (typeof process !== 'undefined') {
-    require('./server')(dust);
+  if (typeof exports === 'object') {
+    module.exports = dust;
+  } else {
+    root.dust = dust;
   }
-  module.exports = dust;
-}
+
+})(this);
+
