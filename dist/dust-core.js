@@ -200,18 +200,7 @@
       } else {
         return JSON.parse(value);
       }
-    },
-		eb: function(value, context){
-			var phs = value.match(/\{([0-9a-zA-Z]+?)\}/g) || [];
-			var pn, pval, rx;
-			for (var i = 0, len = phs.length; i<len; i++) {
-				pn = phs[i].substr(1).replace("}","");
-				pval = context.get(pn);
-				rx = new RegExp("{" + pn + "}", "g");
-				value = value.replace(rx,pval);
-			}
-			return value;
-		}
+    }
   };
 
   function Context(stack, global, blocks, templateName) {
